@@ -19,7 +19,7 @@ if __name__ == '__main__':
     ])
 
     # Transmission matrix indicating which node is transmitting to which node
-    # In this example, node 0 is transmitting to node 1 and node 2 is transmitting to node 3
+    # In this example, node 0 is transmitting to node 1 and node 3 is transmitting to node 2
     tx = jnp.array([
         [0, 1, 0, 0],
         [0, 0, 0, 0],
