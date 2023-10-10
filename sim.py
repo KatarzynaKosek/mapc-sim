@@ -62,7 +62,8 @@ def network_throughput(key: PRNGKey, tx: Array, pos: Array, mcs: Array, tx_power
     snr = tx_power - path_loss - DEFAULT_NOISE
     snr = jnp.where(jnp.isinf(snr), 0., snr)
 
-    snr_plus_interference = snr[:, tx.any(axis=-1)].sum(axis=-1)
+    tx_nodes = tx.any(axis=-1)[..., None]
+    snr_plus_interference = jnp.where(tx_nodes, snr, 0.).sum(axis=0)
     sinr = 2 * snr - snr_plus_interference
     sinr = sinr + noise * jax.random.normal(key, shape=path_loss.shape)
     sinr = (sinr * tx).sum(axis=-1)
@@ -94,4 +95,4 @@ def init_static_network(pos: Array, mcs: Array, tx_power: Array, noise: Scalar) 
         Function that calculates the network throughput.
     """
 
-    return partial(network_throughput, pos=pos, mcs=mcs, tx_power=tx_power, noise=noise)
+    return jax.jit(partial(network_throughput, pos=pos, mcs=mcs, tx_power=tx_power, noise=noise))
