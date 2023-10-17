@@ -9,10 +9,10 @@ from chex import Array, PRNGKey, Scalar
 # LogDistance channel model
 # https://www.nsnam.org/docs/models/html/wifi-testing.html#packet-error-rate-performance
 # https://www.nsnam.org/docs/models/html/propagation.html#logdistancepropagationlossmodel
-DEFAULT_TX_POWER = 16.0206
-DEFAULT_NOISE = -93.97
-REFERENCE_LOSS = 46.6777
-EXPONENT = 3.0
+DEFAULT_TX_POWER = 20 # 16.0206
+DEFAULT_NOISE = -92 # -93.97
+REFERENCE_LOSS = 35 #46.6777
+EXPONENT = 4 #3.0
 
 # Data rates for IEEE 802.11ax standard, 20 MHz channel width, 1 spatial stream, and 3200 ns GI
 DATA_RATES = jnp.array([7.3, 14.6, 21.9, 29.3, 43.9, 58.5, 65.8, 73.1, 87.8, 97.5, 109.7, 121.9])
@@ -25,7 +25,7 @@ MIN_SNRS = jnp.array([
 ])
 
 
-def network_throughput(key: PRNGKey, tx: Array, pos: Array, mcs: Array, tx_power: Array, noise: Scalar) -> Scalar:
+def network_throughput(key: PRNGKey, tx: Array, rx: Array, pos: Array, mcs: Array, tx_power: Array, noise: Scalar) -> Scalar:
     """
     Calculates the approximate network throughput based on the nodes' positions, MCS, and tx power.
     Channel is modeled using log-distance path loss model with additive white Gaussian noise.
@@ -59,19 +59,29 @@ def network_throughput(key: PRNGKey, tx: Array, pos: Array, mcs: Array, tx_power
     distance = jnp.sqrt(jnp.sum((pos[:, None, :] - pos[None, ...]) ** 2, axis=-1))
 
     path_loss = REFERENCE_LOSS + 10 * EXPONENT * jnp.log10(distance)
-    snr = tx_power - path_loss - DEFAULT_NOISE
+    snr = tx_power - path_loss #- DEFAULT_NOISE
     snr = jnp.where(jnp.isinf(snr), 0., snr)
+    snr = (snr * tx).sum(axis=0)
 
+    
     tx_nodes = tx.any(axis=-1)[..., None]
-    snr_plus_interference = jnp.where(tx_nodes, snr, 0.).sum(axis=0)
-    sinr = 2 * snr - snr_plus_interference
+    
+    interference = tx_power - path_loss #- DEFAULT_NOISE
+    interference = jnp.where(jnp.isinf(interference), 0., interference)
+    interference = (interference * rx).sum(axis=0)
+    snr_plus_interference = jnp.power(10,interference/10)
+    noise = jnp.power(10, DEFAULT_NOISE/10)
+    sinr =  jnp.where(tx, snr, 0.).sum(axis=0) - 10*jnp.log10(snr_plus_interference +noise)
     sinr = sinr + noise * jax.random.normal(key, shape=path_loss.shape)
-    sinr = (sinr * tx).sum(axis=-1)
+    sinr = (sinr * (tx)).sum(axis=0)
+    
+    norm=jax.scipy.stats.norm.cdf(sinr, loc=MIN_SNRS[mcs], scale=2.)
 
-    success_probability = jax.scipy.stats.norm.cdf(sinr, loc=MIN_SNRS[mcs], scale=2.)
+    success_probability = jnp.where(sinr, norm, 0.)
+
     expected_data_rate = DATA_RATES[mcs] * success_probability
 
-    return expected_data_rate.sum()
+    return expected_data_rate.sum(), snr, sinr, success_probability, tx_nodes, snr_plus_interference,  expected_data_rate, interference
 
 
 def init_static_network(pos: Array, mcs: Array, tx_power: Array, noise: Scalar) -> Callable:
