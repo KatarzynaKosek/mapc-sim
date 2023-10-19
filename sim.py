@@ -10,7 +10,7 @@ from chex import Array, PRNGKey, Scalar
 # https://www.nsnam.org/docs/models/html/propagation.html#logdistancepropagationlossmodel
 DEFAULT_TX_POWER = 16.0206  # (40 mW) https://www.nsnam.org/docs/release/3.40/doxygen/d0/d7d/wifi-phy_8cc_source.html#l00171
 REFERENCE_LOSS = 46.6777    # https://www.nsnam.org/docs/release/3.40/doxygen/d5/d74/propagation-loss-model_8cc_source.html#l00493
-EXPONENT = 3.0              # https://www.nsnam.org/docs/release/3.40/doxygen/d5/d74/propagation-loss-model_8cc_source.html#l00483
+EXPONENT = 2.0              # https://www.nsnam.org/docs/release/3.40/doxygen/d5/d74/propagation-loss-model_8cc_source.html#l00483
 NOISE_FLOOR = -93.97        # https://www.nsnam.org/docs/models/html/wifi-testing.html#packet-error-rate-performance
 NOISE_FLOOR_LIN = jnp.power(10, NOISE_FLOOR / 10)
 
